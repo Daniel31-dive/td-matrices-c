@@ -1,0 +1,117 @@
+/*
+ * matrice_calcul.c -- Opérations arithmétiques sur les matrices.
+ *
+ * Exercice 3 : complété (étapes 3.a à 3.g).
+ */
+#include <limits.h>
+#include <stddef.h>
+#include "matrice_calcul.h"
+#include "matrice_alloc.h"
+
+/* ------------------------------------------------------------------
+ * FOURNI -- Contrôles communs aux deux opérations.
+ * Refuse res NULL ou égal à une entrée (sans rien modifier), met *res
+ * à l'état vide, puis vérifie que a et b sont valides.
+ * ------------------------------------------------------------------ */
+static MatErreur verifier_parametres(const Matrice *a, const Matrice *b,
+                                     Matrice *res)
+{
+    if (res == NULL || res == a || res == b)
+        return MAT_ERR_ARGUMENT;
+    *res = MATRICE_VIDE;
+    if (!mat_est_valide(a) || !mat_est_valide(b))
+        return MAT_ERR_ARGUMENT;
+    return MAT_OK;
+}
+
+/* FOURNI -- Un résultat calculé en long long tient-il dans un int ? */
+static int tient_dans_int(long long v)
+{
+    return v >= INT_MIN && v <= INT_MAX;
+}
+
+MatErreur mat_additionner(const Matrice *a, const Matrice *b,
+                          Matrice *res)
+{
+    MatErreur err = verifier_parametres(a, b, res);      /* FOURNI */
+    if (err != MAT_OK)
+        return err;
+
+    /* (3.a) Même nombre de lignes ET même nombre de colonnes. */
+    if (a->nb_lignes != b->nb_lignes || a->nb_colonnes != b->nb_colonnes)
+        return MAT_ERR_DIMENSIONS;
+
+
+    /* (3.b) Le résultat a les dimensions de a. */
+    Matrice r = MATRICE_VIDE;
+    err = mat_allouer(&r, a->nb_lignes, a->nb_colonnes);
+    if (err != MAT_OK)
+        return err;
+
+
+    /* FOURNI : parcours de tous les coefficients de r. */
+    for (int i = 0; i < r.nb_lignes; i++) {
+        for (int j = 0; j < r.nb_colonnes; j++) {
+            /* (3.c) Somme calculée en long long : pas de débordement. */
+            long long s = (long long)a->coef[i][j] + b->coef[i][j];
+
+            if (!tient_dans_int(s)) {                    /* FOURNI */
+                mat_detruire(&r);
+                return MAT_ERR_DEPASSEMENT;
+            }
+            r.coef[i][j] = (int)s;
+        }
+    }
+
+    /* (3.d) Transfert de propriété à l'appelant. */
+    *res = r;
+    return MAT_OK;
+}
+
+MatErreur mat_multiplier(const Matrice *a, const Matrice *b,
+                         Matrice *res)
+{
+    MatErreur err = verifier_parametres(a, b, res);      /* FOURNI */
+    if (err != MAT_OK)
+        return err;
+
+    /* (3.e) Colonnes de a == lignes de b. */
+    if (a->nb_colonnes != b->nb_lignes)
+        return MAT_ERR_DIMENSIONS;
+
+
+    /* (3.f) Résultat de dimensions (lignes de a) x (colonnes de b). */
+    Matrice r = MATRICE_VIDE;
+    err = mat_allouer(&r, a->nb_lignes, b->nb_colonnes);
+    if (err != MAT_OK)
+        return err;
+
+
+    for (int i = 0; i < r.nb_lignes; i++) {              /* FOURNI */
+        for (int j = 0; j < r.nb_colonnes; j++) {
+            long long s = 0;
+
+            /* (3.g) c_ij = somme sur k de a(i,k) x b(k,j), avec contrôle
+             *       de dépassement de la somme avant chaque addition. */
+            for (int k = 0; k < a->nb_colonnes; k++) {
+                long long p = (long long)a->coef[i][k] * b->coef[k][j];
+                if ((p > 0 && s > LLONG_MAX - p)
+                    || (p < 0 && s < LLONG_MIN - p)) {
+                    mat_detruire(&r);
+                    return MAT_ERR_DEPASSEMENT;
+                }
+                s += p;
+            }
+
+            if (!tient_dans_int(s)) {                    /* FOURNI */
+                mat_detruire(&r);
+                return MAT_ERR_DEPASSEMENT;
+            }
+            r.coef[i][j] = (int)s;
+        }
+    }
+
+    /* (3.h) Transfert de propriété à l'appelant. */
+    *res = r;
+    return MAT_OK;
+}
